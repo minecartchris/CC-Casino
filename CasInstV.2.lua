@@ -1,4 +1,6 @@
-local serverPath = "https://git.astronand.dev/minecartchris/CC-Casnio/raw/branch/main/prog"
+local branch = "prog"
+local serverPath = "https://git.astronand.dev/minecartchris/CC-Casnio/raw/branch/main/" + branch
+
 while true do 
     if fs.exists("startup.lua") then 
         print("Would you like to Update the Current Startup File")
