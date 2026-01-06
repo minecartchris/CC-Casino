@@ -32,11 +32,11 @@ local answer = io.read()
 --local id = disk.getID("bottom")
 if answer == "d" or answer == "deposit" then
     local item = turtle.getItemDetail()
-    --if item.name ~= "minecraft:iron_ingot" or item.name == nil then
-    --    print("Please insert iron ingots!")
-    --    sleep(1)
-    --    shell.run("reboot")
-    --end
+    if item.name ~= "minecraft:iron_ingot" or item.name == nil then
+        print("Please insert iron ingots!")
+        sleep(1)
+        shell.run("reboot")
+    end
 
     local ironCount = turtle.getItemCount()
     --local card = fs.open("/disk/money.lua", "r")
