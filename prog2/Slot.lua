@@ -1,17 +1,38 @@
 --Slot
 
-local function interactWithCard(nfc, mode, money)
+rednet.open("back")
+
+local function interactWithCard(userUUID, mode, money)
     if mode == "updateBalance" then
-        nfc.write(tostring(money))
-        print("Please tap your card to update balance")
-        while not os.pullEvent("nfc_write") do
-            sleep(0)
-        end
+        rednet.broadcast({
+            uuid = userUUID,
+            amount = money,
+            type = "set"
+        }, "machineBalanceModifier")
     end
+
     if mode == "getBalance" then
-        print("Please tap your card to check balance")
-        local blank, yes, money = os.pullEvent("nfc_data")
-        return money
+        local _, _, cardUUID = os.pullEvent("nfc_data")
+        rednet.broadcast({
+            card = cardUUID
+        }, "getAccountData")
+
+        while true do
+            local id, message = rednet.receive("server_response", 10)
+            if not id then
+                print("the server is down")
+                print("please ping @minecartchris")
+                sleep(30)
+                --shell.run("reboot")
+            end
+            if message.type == "account_data" and message.cardId == cardUUID then
+                local money = message.balance
+                local playerUUID = message.uuid
+                local username = message.username
+                return money, playerUUID, username
+            end
+
+        end
     end
 end
 
@@ -20,7 +41,7 @@ sleep(0.25)
 
 nfc = peripheral.wrap("bottom")
 
-os.pullEvent=os.pullEventRaw
+--os.pullEvent=os.pullEventRaw
 if fs.exists("/disk/terminate") then
     error("Service mode active",2)
 end
@@ -40,8 +61,12 @@ local bet = 0
 --local money2 = fs.open("/disk2/money.lua", "r")
 print("Welcome to the Slot Machine!")
 print("Please swipe your card to begin")
-money = interactWithCard(nfc, "getBalance", nil)
+
+--local _, _, userUUID = os.pullEvent("nfc_data")
+money, playerUUID, username = interactWithCard(nil, "getBalance", nil)
+
 --money2.close()
+print("Welcome "..tostring(username))
 local h = fs.open("disk/house.lua", "r")
 house = h.readAll()
 h.close()
@@ -50,11 +75,11 @@ money = tonumber(money)
 print("what is your bet?")
 bet = tonumber(io.read())
 print("what is your guess 1 to 15?")
-userGess = tonumber(io.read()) 
+userGess = tonumber(io.read())
 if bet > money then
    print("You do not have enough funds")
    sleep(3)
-   shell.run("reboot") 
+   shell.run("reboot")
 end
 randnum = tonumber(math.random(0, 14) + 1)
 if userGess == randnum then
@@ -67,6 +92,7 @@ if not winner then
     money = money - bet
     house = house + bet
     print("you have $",money, "left over")
+    interactWithCard(playerUUID, "updateBalance", money)
 end
 if winner then
     bet = bet * 2
@@ -74,17 +100,17 @@ if winner then
     print("You win!!!!!")
     house = house - bet
     print("You now have $", money)
+    interactWithCard(playerUUID, "updateBalance", money)
 end
 --money2 = fs.open("/disk2/money.lua", "w")
-interactWithCard(nfc, "updateBalance", money)
 --money2.close()
 
-while true do 
+while true do
     print("Would you like to play again")
     local PA=io.read()
     if (PA=="Y") then
         break
-    elseif (PA=="N") then 
+    elseif (PA=="N") then
         --tmp.ejectDisk()
         break
     else
@@ -97,5 +123,4 @@ h.write(house)
 h.close()
 --print("If removing your card do it now")
 sleep(2)
-shell.run("clear all")
-shell.run("startup")
+os.reboot()
