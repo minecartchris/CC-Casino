@@ -76,8 +76,8 @@ print("what is your bet?")
 bet = tonumber(io.read())
 print("what is your guess 1 to 15?")
 userGess = tonumber(io.read())
-if bet > money then
-   print("You do not have enough funds")
+if not bet or bet > money then
+   print("You do not have enough funds or did not enter a bet.")
    sleep(3)
    shell.run("reboot")
 end
