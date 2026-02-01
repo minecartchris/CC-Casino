@@ -89,7 +89,7 @@ money = tonumber(money)
 print("what is your bet?")
 local bet = io.read()
 bet = tonumber(bet)
-if bet < 20 then
+if not bet or bet < 20 then
     bet = 20
 end
 if bet > money then
