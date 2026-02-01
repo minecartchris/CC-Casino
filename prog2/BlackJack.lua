@@ -1,4 +1,5 @@
 --black
+rednet.open("back")
 
 local function interactWithCard(userUUID, mode, money)
     if mode == "updateBalance" then
@@ -42,7 +43,14 @@ end
 --local tmp = peripheral.wrap("bottom")
 --tmp.ejectDisk()
 
-os.pullEvent=os.pullEventRaw
+os.pullEvent= function(...)
+    while true do
+        local t = table.pack(os.pullEventRaw(...))
+        if t[1] ~= "terminate" then
+            return table.unpack(t,1,t.n)
+        end
+    end
+end
 print("Was Made By Gaurdian15")
 if fs.exists("/disk/terminate") then
     error("Service mode active",2)
@@ -64,18 +72,16 @@ local function calculate(win, amount, money)
     --if not disk.isPresent() then
         --os.reboot()
     --end
-
-    if win == "n" then
-        money = money - amount
-        house = house + amount
-    elseif win == "y" then
+    if win then
         money = money + amount
-        house = house - amount
+    else
+        money = money - amount
     end
+    return money
 end
 print("Was Made By Gaurdian15")
 --local money2 = fs.open("/disk2/money.lua", "r")
-money, playerUUID, username = interactWithCard(nil, "getBalance", nil)
+local money, playerUUID, username = interactWithCard(nil, "getBalance", nil)
 --money2.close()
 
 money = tonumber(money)
@@ -101,7 +107,7 @@ local pcard= pcard1+pcard2
 acard1= math.random(1,11)
 acard2= math.random(1,11)
 local acard=acard1+acard2
-while true do 
+while true do
     print("Card 1: ",pcard1)
     print("Card 2: ",pcard2)
     print("Total: ",pcard)
@@ -114,8 +120,8 @@ while true do
         print("you Bust")
         calculate(n, bet, money)
         break
-    end    
-    if(ans=="Y") then 
+    end
+    if(ans=="Y") then
         local anscard= math.random(1,11)
         pcard=pcard+anscard
     elseif (ans=="N") then
@@ -138,31 +144,31 @@ while true do
     end
 end
 if(pcard>21) then
-    calculate(n, bet, money)
+    money = calculate(false, bet, money)
     print("You Busted")
 elseif(acard>21) then
-    calculate(y, bet, money)
+    money = calculate(true, bet, money)
     print("Dealer Bust's")
 elseif (pcard>acard) then
-    calculate(y, bet, money)
+    moeny = calculate(true, bet, money)
     print("You Won")
 elseif(acard>pcard) then
-    calculate(n, bet, money) 
+    money = calculate(false, bet, money)
     print("The Dealer won")
 elseif(acard==pcard) then
     print("Push No One Wins")
 end
 
 
-
+print("Your new balance is: "..money)
 
 --money2 = fs.open("/disk2/money.lua", "w")
 interactWithCard(playerUUID, "updateBalance", money)
 --money2.close()
 
-h = fs.open("disk/house.lua", "w")
-h.write(house)
-h.close()
+--h = fs.open("disk/house.lua", "w")
+--h.write(house)
+--h.close()
 print("If removing your card do it now")
 sleep(5)
 os.reboot()
