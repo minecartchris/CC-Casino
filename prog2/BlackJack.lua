@@ -1,19 +1,39 @@
 --black
 
-local function interactWithCard(nfc, mode, money)
+local function interactWithCard(userUUID, mode, money)
     if mode == "updateBalance" then
-        nfc.write(tostring(money))
-        print("Please tap your card to update balance")
-        while not os.pullEvent("nfc_write") do
-            sleep(0)
+        rednet.broadcast({
+            uuid = userUUID,
+            amount = money,
+            type = "set"
+        }, "machineBalanceModifier")
+    end
+
+    if mode == "getBalance" then
+        local _, _, cardUUID = os.pullEvent("nfc_data")
+        rednet.broadcast({
+            card = cardUUID
+        }, "getAccountData")
+
+        while true do
+            local id, message = rednet.receive("server_response", 10)
+            if not id then
+                print("the server is down")
+                print("please ping @minecartchris")
+                sleep(30)
+                --shell.run("reboot")
+            end
+            if message.type == "account_data" and message.cardId == cardUUID then
+                local money = message.balance
+                local playerUUID = message.uuid
+                local username = message.username
+                return money, playerUUID, username
+            end
+
         end
     end
-    if mode == "getBalance" then
-        print("Please tap your card to check balance")
-        local blank, yes, money = os.pullEvent("nfc_data")
-        return money
-    end
 end
+
 
 
 
@@ -37,7 +57,7 @@ shell.run("clear all")
 
 --print("Please do not remove your card from the drive during games")
 
-local nfc = peripheral.wrap("bottom")
+
 
 local function calculate(win, amount, money)
     --local disk = peripheral.wrap("bottom")
@@ -55,7 +75,7 @@ local function calculate(win, amount, money)
 end
 print("Was Made By Gaurdian15")
 --local money2 = fs.open("/disk2/money.lua", "r")
-money = interactWithCard(nfc, "getBalance", nil)
+money, playerUUID, username = interactWithCard(nil, "getBalance", nil)
 --money2.close()
 
 money = tonumber(money)
@@ -137,20 +157,9 @@ end
 
 
 --money2 = fs.open("/disk2/money.lua", "w")
-interactWithCard(nfc, "updateBalance", money)
+interactWithCard(playerUUID, "updateBalance", money)
 --money2.close()
-while true do 
-    print("Would you liek to play again")
-    local PA=io.read()
-    if (PA=="Y") then
-        break
-    elseif (PA=="N") then 
-        tmp.ejectDisk()
-        break
-    else
-        print("Invalid Input")
-    end
-end
+
 h = fs.open("disk/house.lua", "w")
 h.write(house)
 h.close()
