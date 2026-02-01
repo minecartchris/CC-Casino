@@ -64,8 +64,8 @@ local function input(message)
   return io.read()
 end
 
-local function calculate_winnings(got, bet)
-  local b = tonumber(bet) or 0
+local function calculate_winnings(got, b)
+  --local b = tonumber(bet) or 0
   if got[1] == got[2] and got[2] == got[3] then
     return b * 10
   elseif got[1] == got[2] or got[2] == got[3] or got[1] == got[3] then
@@ -129,7 +129,7 @@ local function run()
 
   term.clear()
   print("Welcome ".. username .." have fun!")
-  local bet_input = input("Bet: ")
+  local bet_input = tonumber(input("Bet: "))
   if money < bet_input then
     print("please get more money or bet less as you can't bet more then you have")
   end
@@ -158,6 +158,7 @@ local function run()
     sleep(0.3)
     draw_display(final)
   end
+  sleep(30)
 end
 shell.execute("clear")
 while true do
