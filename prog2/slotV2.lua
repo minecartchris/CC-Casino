@@ -139,6 +139,7 @@ local function run()
   local bet_input = tonumber(input("Bet: "))
   if money < bet_input then
     print("please get more money or bet less as you can't bet more then you have")
+    return
   end
   local final = draw()
   local current = {nil, nil, nil}
