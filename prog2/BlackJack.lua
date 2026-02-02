@@ -24,6 +24,11 @@ local function interactWithCard(userUUID, mode, money)
                 sleep(30)
                 --shell.run("reboot")
             end
+            if not message then
+                print("WTF!? I got a rednet message with no data!?")
+                print("Rebooting...")
+                sleep(5)
+            end
             if message.type == "account_data" and message.cardId == cardUUID then
                 local money = message.balance
                 local playerUUID = message.uuid

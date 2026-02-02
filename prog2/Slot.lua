@@ -3,12 +3,12 @@
 rednet.open("back")
 
 local function interactWithCard(userUUID, mode, money)
-    if mode == "updateBalance" then
-        rednet.broadcast({
-            uuid = userUUID,
-            amount = money,
-            type = "set"
-        }, "machineBalanceModifier")
+if mode == "updateBalance" then
+    rednet.broadcast({
+        uuid = userUUID,
+        amount = money,
+        type = "set"
+    }, "machineBalanceModifier")
     end
 
     if mode == "getBalance" then
@@ -25,6 +25,11 @@ local function interactWithCard(userUUID, mode, money)
                 sleep(30)
                 --shell.run("reboot")
             end
+            if not message then
+                print("WTF!? I got a rednet message with no data!?")
+                print("Rebooting...")
+                sleep(5)
+            end
             if message.type == "account_data" and message.cardId == cardUUID then
                 local money = message.balance
                 local playerUUID = message.uuid
@@ -35,6 +40,7 @@ local function interactWithCard(userUUID, mode, money)
         end
     end
 end
+
 
 
 sleep(0.25)
