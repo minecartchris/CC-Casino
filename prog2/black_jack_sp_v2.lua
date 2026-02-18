@@ -284,8 +284,8 @@ repeat
     term_reset()
     credits_print('jimisdam')
     game_print(dealer_hand, player_hand, #dealer_hand == 2)
-    io.write("Want to Hit (y/n): ")
-until read() ~= 'y'
+    io.write("Want to Hit? (y/n): ")
+until hand_count(player_hand) >= 21 or read() ~= 'y'
 
 while hand_count(dealer_hand) < 17 do
     hand_serve(deck, 1, dealer_hand)
@@ -294,6 +294,10 @@ while hand_count(dealer_hand) < 17 do
     credits_print('jimisdam')
     game_print(dealer_hand, player_hand)
 end
+
+term_reset()
+credits_print('jimisdam')
+game_print(dealer_hand, player_hand)
 
 local winner = game_winner(dealer_hand, player_hand)
 
@@ -308,10 +312,6 @@ elseif winner == 'tie' then
 else
     print('WTF CASE!')
 end
-
-term_reset()
-credits_print('jimisdam')
-game_print(dealer_hand, player_hand)
 
 print('\nBalance: ' .. player_data.balance)
 interactWithCard(player_data.uuid, 'updateBalance', player_data.balance)
