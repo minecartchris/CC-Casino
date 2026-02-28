@@ -55,6 +55,10 @@ do
   accounts = textutils.unserialize(data)
 end
 
+local pkeyFile = fs.open("pkey","r")
+assert(pkeyFile,"private key file does not exist!")
+local pkey = pkeyFile.readLine()
+pkeyFile.close()
 local function createAccount(username,uuid,balance)
 balance = balance or 0
 accounts[uuid] = {
@@ -107,7 +111,7 @@ local function deleteAccount(uuid)
 end
 
 local kromerNode = "https://kromer.reconnected.cc/api/krist"
-local pkey = ""
+
 
 local commands = {}
 local function makeaddressbyte(byte)
@@ -246,6 +250,11 @@ commands.balance = {
 }
 commands.withdraw = {
   exec = function(name,uuid,args)
+    local number = tonumber(args[1])
+    if not number then
+        chatbox.tell(uuid,"<red>This is not a number!</red>", "Chris's Casino","minimessage")
+        return
+    end
     if accounts[uuid] and accounts[uuid].banned then
       chatbox.tell(uuid,"<red>You have been banned from Chris's Casino, Please contact a casino maintainer for a balance refund.", "Chris's Casino", "minimessage")
       return
@@ -254,11 +263,10 @@ commands.withdraw = {
       chatbox.tell(name,"<red>You don't have an account, use <blue>\\casino register</blue> to get one", "Chris's Casino", "minimessage")
       return
     end
-    if args[1] then
       local response = http.get(("https://kromer.reconnected.cc/api/v1/wallet/by-name/%s"):format(name))
       response = textutils.unserializeJSON(response.readAll())
       local address = response.data[1].address
-      local amount = math.min(tonumber(args[1]),accounts[uuid].balance)
+      local amount = math.min(number,accounts[uuid].balance)
       print(amount)
       if amount == 0 then
         chatbox.tell(name,"<red>You have no money.</red>","Chris's Casino","minimessage")
@@ -268,7 +276,6 @@ commands.withdraw = {
         os.queueEvent("make_transaction",address,amount)
         chatbox.tell(name,"<red>Withdrew <blue>"..amount.."kro </blue> from your balance. You have <blue>"..accounts[uuid].balance.."</blue> remaining.", "Chris's Casino", "minimessage")
       end
-    end
   end,
   permission = permissions.all
 }
