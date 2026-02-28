@@ -29,6 +29,7 @@ local function interactWithCard(userUUID, mode, money)
         print("WTF!? I got a rednet message with no data!?")
         print("Rebooting...")
         sleep(5)
+        os.reboot()
       end
       if message.type == "account_data" and message.cardId == cardUUID then
         local money = message.balance
