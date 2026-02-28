@@ -137,8 +137,12 @@ local function run()
   term.clear()
   print("Welcome " .. username .. " have fun!")
   local bet_input = tonumber(input("Bet: "))
+  if not bet_input then
+    print("Enter a valid number please")
+    return
+  end
   if money < bet_input then
-    print("please get more money or bet less as you can't bet more then you have")
+    print("Please get more money or bet less as you can't bet more then you have")
     return
   elseif bet_input < 0 then
     print("Nice try.")
