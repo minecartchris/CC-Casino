@@ -251,7 +251,7 @@ commands.balance = {
 commands.withdraw = {
   exec = function(name,uuid,args)
     local number = tonumber(args[1])
-    local number = math.floor(number*100)/100
+    number = math.floor(number*100)/100
     if not number then
         chatbox.tell(uuid,"<red>This is not a number!</red>", "Chris's Casino","minimessage")
         return
