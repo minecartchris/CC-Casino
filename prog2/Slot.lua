@@ -82,9 +82,6 @@ money, playerUUID, username = interactWithCard(nil, "getBalance", nil)
 
 --money2.close()
 print("Welcome "..tostring(username))
-local h = fs.open("disk/house.lua", "r")
-house = h.readAll()
-h.close()
 print("$",money)
 money = tonumber(money)
 print("what is your bet?")
@@ -122,9 +119,7 @@ end
 
 
 
-h = fs.open("disk/house.lua", "w")
-h.write(house)
-h.close()
+
 --print("If removing your card do it now")
 sleep(2)
 os.reboot()
