@@ -101,8 +101,7 @@ house = tonumber(house)
 if not winner then
     print("you lost ;(")
     print("The correct number was", randnum)
-    money = money - bet
-    house = house + bet
+    money = money - beT
     print("you have $",money, "left over")
     interactWithCard(playerUUID, "updateBalance", money)
 end
@@ -110,7 +109,6 @@ if winner then
     bet = bet * 2
     money = bet + money
     print("You win!!!!!")
-    house = house - bet
     print("You now have $", money)
     interactWithCard(playerUUID, "updateBalance", money)
 end
