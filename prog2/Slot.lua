@@ -100,7 +100,7 @@ end
 if not winner then
     print("you lost ;(")
     print("The correct number was", randnum)
-    money = money - beT
+    money = money - bet
     print("you have $",money, "left over")
     interactWithCard(playerUUID, "updateBalance", money)
 end
