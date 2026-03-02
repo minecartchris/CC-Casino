@@ -3,8 +3,8 @@
 rednet.open("back")
 
 local function interactWithCard(userUUID, mode, money)
-if mode == "updateBalance" then
-    rednet.broadcast({
+    if mode == "updateBalance" then
+        rednet.broadcast({
         uuid = userUUID,
         amount = money,
         type = "set"
