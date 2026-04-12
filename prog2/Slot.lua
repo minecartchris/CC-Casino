@@ -1,122 +1,110 @@
 --Slot
 
-rednet.open("back")
-
-local function interactWithCard(userUUID, mode, money)
-    if mode == "updateBalance" then
-        rednet.broadcast({
-        uuid = userUUID,
-        amount = money,
-        type = "set"
-    }, "machineBalanceModifier")
-    end
-
-    if mode == "getBalance" then
-        local _, _, cardUUID = os.pullEvent("nfc_data")
-        rednet.broadcast({
-            card = cardUUID
-        }, "getAccountData")
-
-        while true do
-            local id, message = rednet.receive("server_response", 10)
-            if not id then
-                print("the server is down")
-                print("please ping @minecartchris")
-                sleep(30)
-                --shell.run("reboot")
-            end
-            if not message then
-                print("WTF!? I got a rednet message with no data!?")
-                print("Rebooting...")
-                sleep(5)
-                os.reboot()
-            end
-            if message.type == "account_data" and message.cardId == cardUUID then
-                local money = message.balance
-                local playerUUID = message.uuid
-                local username = message.username
-                return money, playerUUID, username
-            end
-
-        end
-    end
-end
-
-
-
-sleep(0.25)
-
-nfc = peripheral.wrap("bottom")
-
-os.pullEvent= function(...)
-    while true do
-        local t = table.pack(os.pullEventRaw(...))
-        if t[1] ~= "terminate" then
-            return table.unpack(t,1,t.n)
-        end
-    end
-end
-
 if fs.exists("/disk/terminate") then
-    error("Service mode active",2)
+    error("terminated for debugging")
 end
-modem = peripheral.wrap("back")
-shell.run("clear all")
---while not fs.exists("/disk2/money.lua") do
-    --sleep(0.75)
-    --print("You do not have a card inserted")
-    --sleep(2)
-    --shell.run("clear all")
---end
---print("Please do not remove your card from the drive during games")
-local money = " "
-local winner = false
-local randnum = 0
-local bet = 0
---local money2 = fs.open("/disk2/money.lua", "r")
-print("Welcome to the Slot Machine!")
-print("Please swipe your card to begin")
+_G.os.pullEvent = _G.os.pullEventRaw
 
---local _, _, userUUID = os.pullEvent("nfc_data")
-money, playerUUID, username = interactWithCard(nil, "getBalance", nil)
-
---money2.close()
-print("Welcome "..tostring(username))
-print("$",money)
-money = tonumber(money)
-print("what is your bet?")
-bet = tonumber(io.read())
-print("what is your guess 1 to 15?")
-userGess = tonumber(io.read())
-if not bet or bet > money or bet < 0 then
-   print("You do not have enough funds or did not enter a bet.")
-   sleep(3)
-   shell.run("reboot")
+local function clear()
+    term.setCursorPos(1, 1)
+    term.clear()
 end
-randnum = tonumber(math.random(0, 14) + 1)
-if userGess == randnum then
-    winner = true
+
+local function main()
+    local nfc = assert(peripheral.find("nfc_reader", function(x) return x == "bottom" end), "NFC reader not found on bottom")
+    local modem = assert(peripheral.find("modem"), "No modem found")
+    local modemName = peripheral.getName(modem)
+
+    rednet.open(modemName)
+
+    local function interactWithCard(userUUID, mode, money)
+        if mode == "updateBalance" then
+            rednet.broadcast({
+                uuid = userUUID,
+                amount = money,
+                type = "set"
+            }, "machineBalanceModifier")
+        end
+
+        if mode == "getBalance" then
+            local _, _, cardUUID = os.pullEvent("nfc_data")
+            rednet.broadcast({
+                card = cardUUID
+            }, "getAccountData")
+
+            while true do
+                local id, message = rednet.receive("server_response", 10)
+                if not id then
+                    error("the server is down\nplease ping @minecartchris")
+                end
+
+                if message.type == "account_data" and message.cardId == cardUUID then
+                    local money = message.balance
+                    local playerUUID = message.uuid
+                    local username = message.username
+                    return money, playerUUID, username
+                end
+
+                error("unexpected behavior, account_data not received")
+            end
+        end
+    end
+
+    while true do
+        clear()
+        print("Welcome to the Slot Machine!")
+        print("Please swipe your card to begin")
+
+        local money, playerUUID, username = interactWithCard(nil, "getBalance", nil)
+        money = tonumber(money)
+
+        clear()
+        print("Welcome "..tostring(username))
+        print("$", money)
+        print("")
+        io.write("Please enter your bet> ")
+        local bet = tonumber(read())
+        if bet and bet <= money and bet > 0 then
+            io.write("Please enter your guess> ")
+            local guess = tonumber(read())
+
+            local randNum = math.random(1, 15)
+
+            print("")
+            if randNum == guess then
+                money = money + bet * 2
+                interactWithCard(playerUUID, "updateBalance", money)
+                print("You win!!!!!")
+                print("You now have $", money)
+            else
+                money = money - bet
+                interactWithCard(playerUUID, "updateBalance", money)
+                print("You lost ;(")
+                print("The correct number was", randNum)
+                print("you have $", money, "left over")
+            end
+        else
+            print("Invalid bet")
+        end
+        sleep(3)
+    end
 end
-if not winner then
-    print("you lost ;(")
-    print("The correct number was", randnum)
-    money = money - bet
-    print("you have $",money, "left over")
-    interactWithCard(playerUUID, "updateBalance", money)
+
+while true do
+    clear()
+    local s, e = pcall(main)
+
+    if not s then
+        clear()
+        printError("Error:", e)
+        printError("Press any key to continue (or auto restarting in 30 seconds)...")
+
+        parallel.waitForAny(function()
+            os.pullEvent("char")
+        end, function()
+            sleep(30)
+        end)
+    end
+
+    sleep()
 end
-if winner then
-    bet = bet * 2
-    money = bet + money
-    print("You win!!!!!")
-    print("You now have $", money)
-    interactWithCard(playerUUID, "updateBalance", money)
-end
---money2 = fs.open("/disk2/money.lua", "w")
---money2.close()
-
-
-
-
---print("If removing your card do it now")
-sleep(2)
-os.reboot()

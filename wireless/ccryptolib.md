@@ -1,1 +1,0 @@
-https://github.com/migeyel/ccryptolib/tree/main/ccryptolib
