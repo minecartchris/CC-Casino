@@ -6,11 +6,16 @@
 
 -- permission function takes uuid as argument
 
+local keys = require "pkey"
+
 local loop = require("taskmaster")()
 local sha256 = require("sha256")
 
 local nfc = peripheral.find("nfc_reader")
 local modem = peripheral.find("modem", function(n,w) return not w.isWireless() end)
+local success, hook = require("DiscordHook").createWebhook(keys.discord)
+local f = require("fstring")
+local shopk = require("lib.shopk")
 
 rednet.open(peripheral.getName(modem))
 local permissions = {}
@@ -27,6 +32,7 @@ function permissions.admin(player)
 end
 
 local accounts = {}
+local locked = {} -- uuid -> os.epoch("utc") when a getAccountData session was opened for that account
 --[[
   Account format:
   {
@@ -55,10 +61,7 @@ do
   accounts = textutils.unserialize(data)
 end
 
-local pkeyFile = fs.open("pkey","r")
-assert(pkeyFile,"private key file does not exist!")
-local pkey = pkeyFile.readLine()
-pkeyFile.close()
+local pkey = keys.kromer
 local function createAccount(username,uuid,balance)
 balance = balance or 0
 accounts[uuid] = {
@@ -152,10 +155,59 @@ local function split(inputstr, sep)
   return t
 end
 local address = make_address(pkey)
-print(address)
+print(f"address is ${address}")
+--[[]]
+local client = shopk{
+  privatekey = pkey
+}
+
+client.on("connected", function(_,address)
+
+  print(f"Logged in as ${address.address}")
+
+end)
+
+client.on("error", function(err)
+
+  print(("Error [%s]: %s"):format(err.error, err.message))
+end)
+
+
+client.on("transaction", function(tx)
+  if tx.to == address then
+  local userUUID = tx.meta.keys.useruuid
+  local username = tx.meta.keys.username
+  if not userUUID then
+    tx.refund(tx.value, "User UUID required")
+    return
+  end
+
+  if not accounts[userUUID] then
+    chatbox.tell(otherUUID,"<red>Player doesn't have an account.", "Chris's Casino", "minimessage")
+    tx.refund(tx.value,"Player doesn't have an account.")
+    return
+  end
+
+  accounts[userUUID].balance = accounts[userUUID].balance + tx.value
+  username = username or userUUID
+  hook.sendEmbed("casino","Casino", f"${username} just deposited ${tx.value} Kromer to their account")
+  chatbox.tell(userUUID,"<green>Added <blue>"..tx.value.."</blue> to your balance", "Chris's Casino", "minimessage")
+  saveAccounts()
+end
+end)
+
+
+--[=[
+
+  Commented out: currency code
+  do not remove until finished.
+
+]=]
+--]]
+--[[
 local function handleWebSockets()
     local id = -1
-    local r,f = http.post(kromerNode.."/ws/start","{\"privatekey\":\""..pkey.."\"}",{["content-type"]="application/json"})
+    local r, balls = http.post(kromerNode.."/ws/start","{\"privatekey\":\""..pkey.."\"}",{["content-type"]="application/json"})
     local resp = textutils.unserialiseJSON(r.readAll())
     r.close()
     r = nil
@@ -170,11 +222,14 @@ local function handleWebSockets()
                 if event[2] == resp.url then
                     wsevent = textutils.unserialiseJSON(event[3])
                     if wsevent.event == "transaction" and wsevent.transaction.to == address then
+                        print(f"Received Transaction from ${wsevent.transaction.from} worth ${wsevent.transaction.value}")
                         local from = wsevent.transaction.from
                         local hasMessage = false
                         local hasError = false
                         local hasUUID = false
-                        local otherUUID = nil
+                        local otherUUID
+                        local hasUsername = false
+                        local username
                         err = ""
                         if wsevent.transaction.metadata then
                             mta = split(wsevent.transaction.metadata,";")
@@ -182,6 +237,10 @@ local function handleWebSockets()
                                 if p:match("useruuid") and not hasUUID then
                                     otherUUID = split(p,"=")[2]
                                     hasUUID = true
+                                end
+                                if p:match("username") and not hasUsername then
+                                    username = split(p,"=")[2]
+                                    hasUsername = true
                                 end
                             end
                         end
@@ -194,7 +253,9 @@ local function handleWebSockets()
                             os.queueEvent("make_transaction",wsevent.transaction.from,wsevent.transaction.value)
                           else
                           accounts[otherUUID].balance = accounts[otherUUID].balance + wsevent.transaction.value
-                          chatbox.tell(otherUUID,"<green>Added <blue>"..wsevent.transaction.value.."</blue> to your balance", "Chris's Casino", "minimessage")
+                          username = username or otherUUID
+                          hook.sendEmbed("casino","Casino", f"${username} just deposited ${tx.value} Kromer to their account")
+                          chatbox.tell(otherUUID,"<green>Added <blue>"..tx.value.."</blue> to your balance", "Chris's Casino", "minimessage")
                           saveAccounts()
                           end
                         end
@@ -225,6 +286,7 @@ local function handleWebSockets()
         end
     end
 end
+]] -- Comment this out when switching
 commands.balance = {
   exec= function(name, uuid, args)
     if accounts[uuid] and accounts[uuid].banned then
@@ -250,6 +312,9 @@ commands.balance = {
 }
 commands.withdraw = {
   exec = function(name,uuid,args)
+    --chatbox.tell(uuid,"<red>Kromer withdrawing is disabled until we fix this fucking bug", "Chris's Casino", "minimessage")
+    --do return end
+
     local number = tonumber(args[1])
     if not number then
         chatbox.tell(uuid,"<red>This is not a number!</red>", "Chris's Casino","minimessage")
@@ -267,13 +332,17 @@ commands.withdraw = {
       response = textutils.unserializeJSON(response.readAll())
       local address = response.data[1].address
       local amount = math.min(number,accounts[uuid].balance)
+      amount = math.max(amount, 0)
+      amount = math.floor(amount * 100) / 100
       print(amount)
       if amount == 0 then
-        chatbox.tell(name,"<red>You have no money.</red>","Chris's Casino","minimessage")
+        chatbox.tell(name,"<red>Invalid input or insufficient funds.</red>","Chris's Casino","minimessage")
       else
         accounts[uuid].balance = accounts[uuid].balance - amount
         saveAccounts()
-        os.queueEvent("make_transaction",address,amount)
+        --os.queueEvent("make_transaction",address,amount)
+		client.send{to=address,amount=amount,metadata="message=Here's your money from casino balance"}
+        hook.sendEmbed("casino","Casino", f"${name} just withdrew ${amount} Kromer from their account")
         chatbox.tell(name,"<red>Withdrew <blue>"..amount.."kro </blue> from your balance. You have <blue>"..accounts[uuid].balance.."</blue> remaining.", "Chris's Casino", "minimessage")
       end
   end,
@@ -387,10 +456,23 @@ commands.setbal = {
       return
     end
     accounts[otherUUID].balance = tonumber(args[2])
-    chatbox.tell(name,"<green>Set"..accounts[otherUUID].username.."'s balance to <blue>"..args[2].."</blue>", "Chris's Casino", "minimessage")
+    chatbox.tell(name,"<green>Set "..accounts[otherUUID].username.."'s balance to <blue>"..args[2].."</blue>", "Chris's Casino", "minimessage")
     saveAccounts()
   end,
   permission = permissions.admin
+}
+commands.help = {
+exec = function(name,uuid,args)
+	chatbox.tell(name,[[<blue>Chris's Casino</blue>
+<gray> \casino register</gray> - Register an NFC card as a Casino Card
+<gray> \casino revoke</gray> - Revokes your card in case it was stolen or cloned
+<gray> \casino bal</gray> - Gets your Casino Balance
+<gray> \casino withdraw <amount></gray> - Withdraws <amount> to your kromer wallet
+]],"Chris's Casino","minimessage")
+--"
+-- above comment is to fix syntax highlighting in some stupid programs
+end,
+permission = permissions.all
 }
 
 local function commandHandler()
@@ -399,8 +481,7 @@ local function commandHandler()
     if command ~= "casino" then goto notOurCommand end
     local subcommand = table.remove(args,1)
     if not commands[subcommand] then
-      chatbox.tell(user,"<red>Invalid subcommand.</red>", "Chris's Casino", "minimessage")
-      goto continue
+		subcommand = "help"
     end
     do
     local uuid = data.user.uuid
@@ -426,6 +507,9 @@ local function rednetMessageHandler()
     local id, message, protocol = rednet.receive()
     if protocol == "machineBalanceModifier" then
       if type(message) ~= "table" or not message.uuid or not message.amount then goto continue_rednet end -- Guard against bullshit messages
+      if message.amount then
+        message.amount = math.floor(message.amount * 100) / 100
+      end
       if message.type == "add" then
         accounts[message.uuid].balance = accounts[message.uuid].balance + message.amount
       end
@@ -435,11 +519,18 @@ local function rednetMessageHandler()
       if message.type == "set" then
         accounts[message.uuid].balance = message.amount
       end
+      locked[message.uuid] = nil
 
     elseif protocol == "getAccountData" then
       if type(message) ~= "table" or not message.card then goto continue_rednet end
+      print(f"Requested card ${message.card}")
       for _, account in pairs(accounts) do
-        if "casinoAccount_"..account.validCard == message.card then -- Here's our guy!
+        if account.validCard and "casinoAccount_"..account.validCard == message.card then -- Here's our guy!
+          if locked[account.uuid] then
+            print(f"Ignoring request for ${account.username}, card session already in progress")
+            break
+          end
+          locked[account.uuid] = os.epoch("utc")
           rednet.send(id,{
             type = "account_data",
             uuid = account.uuid,
@@ -447,6 +538,7 @@ local function rednetMessageHandler()
             balance = account.balance,
             cardId = message.card
         },"server_response")
+        print(f"Got account request for ${account.username}")
           break
         end
       end
@@ -455,8 +547,23 @@ local function rednetMessageHandler()
   end
 end
 
+local LOCK_STALE_MS = 90 * 1000
+local function lockSweeper()
+  while true do
+    sleep(30)
+    local now = os.epoch("utc")
+    for uuid, lockedAt in pairs(locked) do
+      if now - lockedAt > LOCK_STALE_MS then
+        locked[uuid] = nil
+      end
+    end
+  end
+end
+
 
 loop:task(commandHandler)
 :task(rednetMessageHandler)
-:task(handleWebSockets)
+:task(lockSweeper)
+:task(client.run)
+--:task(handleWebSockets)
   :run()

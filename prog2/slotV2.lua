@@ -74,16 +74,16 @@ end
 local function calculate_winnings(got, b)
   --local b = tonumber(bet) or 0
   if got[1] == got[2] and got[2] == got[3] then
-    return b * 10
+    return b * 2
   elseif got[1] == got[2] or got[2] == got[3] or got[1] == got[3] then
-    return b
+    return 0
   else
     return -b
   end
 end
 
 local function draw()
-  local letters = { '', '', '', ' ' }
+  local letters = { '', '', '', '', '', '', '', ' ' }
   local got = {}
   for i = 1, 3 do
     table.insert(got, letters[random(1, #letters)])
@@ -107,7 +107,7 @@ local function draw_display(display)
 end
 
 local function spin(current_got)
-  local letters = { '', '', '', ' ' }
+  local letters = { '', '', '', '', '', '', '', ' ' }
   local delay = 0.05
   for i = 1, 12 do
     local display = {}

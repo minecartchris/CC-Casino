@@ -5,6 +5,9 @@ if fs.exists("/disk/terminate") then
 end
 _G.os.pullEvent = _G.os.pullEventRaw
 
+math.randomseed(os.epoch("utc"))
+for i = 1, 5 do math.random() end
+
 local function clear()
     term.setCursorPos(1, 1)
     term.clear()
@@ -72,7 +75,7 @@ local function main()
 
             print("")
             if randNum == guess then
-                money = money + bet * 2
+                money = money + bet * 4.5
                 interactWithCard(playerUUID, "updateBalance", money)
                 print("You win!!!!!")
                 print("You now have $", money)
