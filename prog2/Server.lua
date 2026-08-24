@@ -33,6 +33,7 @@ end
 
 local accounts = {}
 local locked = {} -- uuid -> os.epoch("utc") when a getAccountData session was opened for that account
+local LOCK_STALE_MS = 90 * 1000 -- moved up here so both rednetMessageHandler and lockSweeper can see it as an upvalue
 --[[
   Account format:
   {
@@ -527,7 +528,14 @@ local function rednetMessageHandler()
       for _, account in pairs(accounts) do
         if account.validCard and "casinoAccount_"..account.validCard == message.card then -- Here's our guy!
           if locked[account.uuid] then
-            print(f"Ignoring request for ${account.username}, card session already in progress")
+            local elapsed = os.epoch("utc") - locked[account.uuid]
+            local remainingSeconds = math.max(0, math.ceil((LOCK_STALE_MS - elapsed) / 1000))
+            rednet.send(id, {
+              type = "account_locked",
+              cardId = message.card,
+              remainingSeconds = remainingSeconds,
+            }, "server_response")
+            print(f"Ignoring request for ${account.username}, card session already in progress (${remainingSeconds}s left)")
             break
           end
           locked[account.uuid] = os.epoch("utc")
@@ -547,7 +555,6 @@ local function rednetMessageHandler()
   end
 end
 
-local LOCK_STALE_MS = 90 * 1000
 local function lockSweeper()
   while true do
     sleep(30)
@@ -560,10 +567,88 @@ local function lockSweeper()
   end
 end
 
+-- Local admin UI on the server's own screen: press L to see every currently
+-- locked account and how long is left on its 90s lock, Up/Down to select
+-- one, C to clear it early (e.g. if a machine crashed mid-transaction and
+-- left a real player's card stuck), Esc to leave. Idle (not in the menu)
+-- this only listens for "key" events, so it doesn't interfere with the
+-- server's normal console output from the other tasks.
+local function lockManagerUI()
+  local inMenu = false
+  local selected = 1
+
+  local function getLockedList()
+    local list = {}
+    local now = os.epoch("utc")
+    for uuid, lockedAt in pairs(locked) do
+      local remaining = math.max(0, math.ceil((LOCK_STALE_MS - (now - lockedAt)) / 1000))
+      if remaining > 0 then
+        local username = (accounts[uuid] and accounts[uuid].username) or uuid
+        table.insert(list, { uuid = uuid, username = username, remaining = remaining })
+      end
+    end
+    table.sort(list, function(a, b) return a.username < b.username end)
+    return list
+  end
+
+  local function draw()
+    local list = getLockedList()
+    if selected > #list then selected = #list end
+    if selected < 1 and #list > 0 then selected = 1 end
+
+    term.clear()
+    term.setCursorPos(1, 1)
+    print("=== Locked Accounts ===")
+    print("Up/Down: select   C: clear lock   Esc: exit")
+    print("")
+    if #list == 0 then
+      print("(no accounts currently locked)")
+    end
+    for i, entry in ipairs(list) do
+      local marker = (i == selected) and "> " or "  "
+      print(marker .. entry.username .. "  (" .. entry.remaining .. "s left)")
+    end
+    return list
+  end
+
+  while true do
+    if not inMenu then
+      local _, key = os.pullEvent("key")
+      if key == keys.l then
+        inMenu = true
+        selected = 1
+      end
+    else
+      local list = draw()
+      os.startTimer(1) -- redraw periodically so the countdown stays live
+      local event, p1 = os.pullEvent()
+      if event == "key" then
+        if p1 == keys.down then
+          if #list > 0 then selected = math.min(#list, selected + 1) end
+        elseif p1 == keys.up then
+          if #list > 0 then selected = math.max(1, selected - 1) end
+        elseif p1 == keys.c then
+          local entry = list[selected]
+          if entry then
+            locked[entry.uuid] = nil
+            print("")
+            print("Cleared lock for " .. entry.username)
+          end
+        elseif p1 == keys.escape then
+          inMenu = false
+          term.clear()
+          term.setCursorPos(1, 1)
+          print("Exited lock menu. Press L to reopen.")
+        end
+      end
+    end
+  end
+end
 
 loop:task(commandHandler)
 :task(rednetMessageHandler)
 :task(lockSweeper)
 :task(client.run)
+:task(lockManagerUI)
 --:task(handleWebSockets)
   :run()

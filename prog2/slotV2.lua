@@ -37,6 +37,13 @@ local function interactWithCard(userUUID, mode, money)
         local username = message.username
         return money, playerUUID, username
       end
+      if message.type == "account_locked" and message.cardId == cardUUID then
+        -- The server already has an open session for this card (it didn't
+        -- get an updateBalance yet, e.g. another machine crashed mid-round).
+        -- Tell the player instead of just timing out and printing a
+        -- misleading "server is down".
+        return "locked", nil, nil, message.remainingSeconds
+      end
     end
   end
 end
@@ -132,7 +139,15 @@ local function run()
   term.clear()
   print("Welcome to the Slot Machine!")
   print("Please swipe your card to begin")
-  money, playerUUID, username = interactWithCard(nil, "getBalance", nil)
+  local lockedSeconds
+  money, playerUUID, username, lockedSeconds = interactWithCard(nil, "getBalance", nil)
+  if money == "locked" then
+    term.clear()
+    print("This card is still finishing another transaction.")
+    print("Please wait " .. lockedSeconds .. "s and try again.")
+    sleep(3)
+    return
+  end
 
   term.clear()
   print("Welcome " .. username .. " have fun!")

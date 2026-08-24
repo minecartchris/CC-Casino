@@ -40,6 +40,14 @@ local function interactWithCard(userUUID, mode, money)
                     username = message.username,
                 }
             end
+
+            if message.type == "account_locked" and message.cardId == cardUUID then
+                -- The server already has an open session for this card (it
+                -- didn't get an updateBalance yet, e.g. another machine
+                -- crashed mid-round). Tell the player instead of just
+                -- timing out and printing a misleading "server is down".
+                return { locked = true, remainingSeconds = message.remainingSeconds }
+            end
         end
     end
 end
@@ -248,6 +256,12 @@ print('Please swipe your card to begin')
 
 local player_data = interactWithCard(nil, "getBalance", nil)
 if player_data == 'error' then
+    goto post_init
+end
+if player_data.locked then
+    print('This card is still finishing another transaction.')
+    print('Please wait ' .. player_data.remainingSeconds .. 's and try again.')
+    sleep(3)
     goto post_init
 end
 
