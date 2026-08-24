@@ -144,10 +144,17 @@ local function clamp_col(col, w)
 end
 
 -- Symmetric payout curve: edges pay big (rare), center pays little (common).
--- Tune this table after testing to adjust the house edge.
+-- With ROWS=8 the landing slot follows a binomial(8,0.5) distribution, so
+-- the center slot alone is hit ~27% of the time - it dominates the average
+-- return and has to be tuned with that weight in mind, not just picked to
+-- "look" like a nice curve. The previous table {5,2,1,.5,.2,.5,1,2,5} only
+-- returned ~65.6% of every bet on average (a ~34% house edge - see the
+-- probability-weighted math below). This one returns ~94.8% (~5.2% edge,
+-- in line with real casino games). Tune with that expected-value check
+-- before changing it again.
 local ROWS = 8
-local MULTIPLIERS = { 5, 2, 1, 0.5, 0.2, 0.5, 1, 2, 5 }
-local MULT_LABELS = { "5x", "2x", "1x", ".5x", ".2x", ".5x", "1x", "2x", "5x" }
+local MULTIPLIERS = { 8, 2, 1, 0.8, 0.7, 0.8, 1, 2, 8 }
+local MULT_LABELS = { "8x", "2x", "1x", ".8x", ".7x", ".8x", "1x", "2x", "8x" }
 local SLOTS = #MULTIPLIERS
 local CELL_W = 3
 
@@ -294,15 +301,16 @@ local function get_bet_via_keyboard(money)
 end
 
 local function drop_ball(bet, money, buttons)
-  local position = 0
+  -- Start centered, like a real Galton board, and bounce left/right off
+  -- each peg (+-0.5 per row) instead of starting pinned to the left edge
+  -- and only ever drifting right - that looked biased toward the middle
+  -- even though the final landing distribution was always symmetric.
+  local position = ROWS / 2
   local delay = 0.12
   draw_frame(bet, money, buttons, 0, position)
   sleep(0.3)
   for row = 1, ROWS do
-    local nextPos = position
-    if random(0, 1) == 1 then
-      nextPos = position + 1
-    end
+    local nextPos = position + ((random(0, 1) == 1) and 0.5 or -0.5)
     -- half-step: ball drifts sideways before settling on the row below,
     -- for a smoother fall instead of jumping row to row
     draw_frame(bet, money, buttons, row - 1, (position + nextPos) / 2)
