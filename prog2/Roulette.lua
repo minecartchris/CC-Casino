@@ -139,14 +139,18 @@ local function interactWithCard(userUUID, mode, money)
   end
 end
 
-os.pullEvent = function(...)
-  while true do
-    local t = table.pack(os.pullEventRaw(...))
-    if t[1] ~= "terminate" then
-      return table.unpack(t, 1, t.n)
-    end
-  end
-end
+-- TESTING: terminate-catch disabled so a single Ctrl+T kills this instead
+-- of needing a held Ctrl+T. Re-enable before this goes back to real players
+-- (uncomment below) - otherwise a mid-round Ctrl+T can leave a card locked
+-- until the 90s lock sweep, instead of the round finishing cleanly.
+ os.pullEvent = function(...)
+   while true do
+     local t = table.pack(os.pullEventRaw(...))
+     if t[1] ~= "terminate" then
+       return table.unpack(t, 1, t.n)
+     end
+   end
+ end
 
 if fs.exists("/disk/terminate") then
   error("Service mode active", 2)
